@@ -1,0 +1,35 @@
+
+name: Update babel.config.js core-js version
+on:
+  push:
+    branches:
+      - "renovate/core-js-3.x"
+  workflow_dispatch:
+jobs:
+  update-babel-config-corejs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Create local changes
+        run: |
+          cd ./template
+          VERSION=`cat package.json| grep core-js | grep -o '3\.[0-9]\{1,2\}'`
+          echo $VERSION
+          ROW=`cat babel.config.js| sed -n "/corejs/="`
+          sed -i -e ""$ROW"s/3\.[0-9]\{1,2\}/$VERSION/g" babel.config.js
+      - name: Commit files
+        id: commit_files
+        continue-on-error: true
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update babel.config.js core-js" ./template/babel.config.js
+      - name: Push changes
+        if: steps.commit_files.outcome == 'success'
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
