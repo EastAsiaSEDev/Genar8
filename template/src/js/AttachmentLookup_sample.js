@@ -10,21 +10,21 @@
   kintone.events.on([
     'app.record.create.submit.success',
     'app.record.edit.submit.success',
-  ], async (ev) => {
-    const subtable = ev.record[targetTable].value;
+  ], async (event) => {
+    const subtable = event.record[targetTable].value;
     const appId = kintone.app.getLookupTargetAppId(lookupField);
-    const row = []; // 加工データ挿入用配列
+    const newRows = []; // 加工データ挿入用配列
 
-    for await (let elem of subtable){ 
-      const key = elem.value[KeyField].value;
+    for await (let row of subtable){ 
+      const key = row.value[KeyField].value;
       if(!key) {
-        delete elem.value[lookupField];
-        row.push(elem);
+        delete row.value[lookupField];
+        newRows.push(row);
         continue;
       }
       const originRecord = await client.record.getRecord({app: appId, id: key});
       // ルックアップ元から添付ファイルをダウンロード
-      const files = await kintone.Promise.all(originRecord.record[originAttachmentsField].value.map(async (originFileInfomation) => {
+      const files = await Promise.all(originRecord.record[originAttachmentsField].value.map(async (originFileInfomation) => {
         const fileData = await client.file.downloadFile({fileKey: originFileInfomation.fileKey})
           return {
             file: {
@@ -35,25 +35,25 @@
         }));
 
       // ルックアップ先へ添付ファイル
-      const copyFileInfomations = await kintone.Promise.all(files.map(async (file) => {
+      const copyFileInfomations = await Promise.all(files.map(async (file) => {
         return client.file.uploadFile(file);
       }));
 
-      elem.value[attachmentsField].value = copyFileInfomations;
-      delete elem.value[lookupField];
-      row.push(elem);
+      row.value[attachmentsField].value = copyFileInfomations;
+      delete row.value[lookupField];
+      newRows.push(row);
     };
 
     await client.record.updateRecord({
-      app: ev.appId,
-      id: ev.recordId,
+      app: event.appId,
+      id: event.recordId,
       record: {
         [targetTable]:{
-          value: row 
+          value: newRows 
         }
       }
     })
 
-    return ev;
+    return event;
   });
 })();
